@@ -1,0 +1,56 @@
+#!/usr/bin/perl
+
+### Guillaume Laval (15 09 2021)
+### Script used to compute the OR of selection from empirical 1000G data
+### This script is provided *as is* without warranty of any kind.
+### This script needs logistic regression files prepared in advance for each neutrality statistic used.
+
+### names of the logistic files for the i^th neutrality statistics 
+###		chromosome 1    : LOGISTIC_stati_chr1.txt"
+###		chromosome 2    : LOGISTIC_stati_chr2.txt"
+###		....
+###		chromosome 22   : LOGISTIC_stati_chr22.txt"
+###		all chromosomes : LOGISTIC_stati_allchr.txt"
+
+#Example 1: compute the uncorrected ( LOGISTIC_MODEL=0 ) and corrected ( LOGISTIC_MODEL=1 ) ORs using all 1000G SNPs genome-wide
+	#for each neutrality statistic used
+	for ( $istat=0 ; $istat<$nstat ; $istat++ ) {
+		#for each logistic model
+		for ( $logistic_model=0 ; $logistic_model<=1 ; $logistic_model++ ) {
+			$input_file="LOGISTIC_stat$istat"."_allchr.txt";			
+			$command = "./OddsRatio.sh $logistic_file $logistic_model";
+			#system($command);		
+			$output_file=$input_file.".OR.txt";
+			
+			open($tempfile, "<", "$output_file") or die "cannot open < $output_file: $!";		
+			$templine=<$tempfile>; #skip header
+			$templine=<$tempfile>; chomp($templine); @temp=split(/\t/,$templine);
+			
+			$OR[$istat][$logistic_model]=$temp[1];
+		}	
+	}
+
+#Example 2: compute the uncorrected ( LOGISTIC_MODEL=0 ) and corrected ( LOGISTIC_MODEL=1 ) ORs averaged across the 1000G chromosomes
+	#for each neutrality statistic used
+	for ( $istat=0 ; $istat<$nstat ; $istat++ ) {
+		#for each logistic model
+		for ( $logistic_model=0 ; $logistic_model<=1 ; $logistic_model++ ) {
+			#for each 1000G chromosome
+			for ( $ichr=1 ; $ichr<=22 ; $ichr++ ) {
+				$input_file="LOGISTIC_stat$istat"."_chr$ichr.txt";			
+				$command = "./OddsRatio.sh $logistic_file $logistic_model";
+				#system($command);		
+				$output_file=$input_file.".OR.txt";
+				
+				open($tempfile, "<", "$output_file") or die "cannot open < $output_file: $!";		
+				$templine=<$tempfile>; #skip header
+				$templine=<$tempfile>; chomp($templine); @temp=split(/\t/,$templine);
+				
+				$averageOR[$istat][$logistic_model]+=$temp[1];	
+			}
+			$averageOR[$istat][$logistic_model]/=22;
+		}	
+	}
+
+
+

@@ -1,0 +1,2 @@
+OR(eq1)	uncorrected_OR(eq2)	Ratio
+1.735635 	1.735635 	1.728049 

@@ -1,0 +1,124 @@
+//Template SLIM parameter file to simulate a selective sweep in the African population
+//European and Asian populations used as neutral reference outgoups
+//Selected mutation located in the middle of a 5Mbp DNA region
+//Rescaled demographic parameters 
+//		effective sizes & and divergence times divided by 10
+//		Mutation & recombination rates multiplied by 10
+
+
+initialize() {
+	initializeMutationRate(2.36e-7);
+	initializeMutationType("m1", 0.5, "f", 0.0);
+	initializeGenomicElementType("g1", m1, 1.0);
+	
+	//5Mbp DNA region	
+	initializeGenomicElement(g1, 0, $LENGTH);		
+	initializeRecombinationRate(1.5e-7);
+	
+	//Recombination map
+	rm_lines=readFile("$RECMAP_file");
+	rm_rates=NULL;
+	rm_ends=NULL;
+	for (line in rm_lines){
+		components=strsplit(line,"\t");
+		rm_ends=c(rm_ends,asInteger(components[0]));
+		rm_rates=c(rm_rates,asFloat(components[1])*10);
+	}
+	initializeRecombinationRate(rm_rates,rm_ends);
+	
+	//Selection model: classic sweep (codominant)
+	initializeMutationType("m2",  0.5, "f", $Scoef);	
+}
+
+	5000 late() {
+		//start simulation from burnin simulations (5N generations in a constant size population)
+		sim.readFromPopulationFile("$ANCESTOR_file");
+	}
+
+	//Expand the African population size
+	5001 {
+		p1.setSubpopulationSize(2400);
+	}
+
+	// 0oA Split AFR - EURASI (p1 = AFR   p2 = EURASI) ~100000 years (4000 generations) ago 
+	5350 {
+		sim.addSubpopSplit("p2", 770, p1);		
+	}
+	//0oA bottleneck
+	5351 {  p2.setSubpopulationSize(12); }
+	5352 {  p2.setSubpopulationSize(770); }
+
+	// Add new selected mutation in AGR at 250,000 position
+	$MUT_age late() {		
+		muts = sim.mutations;
+		muts = muts[sim.mutationFrequencies(p1, muts) > 0];
+		
+		mut = sample(muts, 1);
+		onsetfreq=sim.mutationFrequencies(p1, mut);		
+		cat("freq at the onset of selection\t" + onsetfreq + "\n");
+		
+		startcount=asInteger(p1.individualCount * onsetfreq );
+		if( startcount < 1 ){
+			startcount=1;
+		}		  
+		target = sample(p1.genomes, startcount);
+		target.addNewDrawnMutation(m2, $SELPOS);		
+	}
+	
+	// Split EUR - ASI (p2 = EUR  p3 = ASI) ~20000 years (800 generations) ago
+	5500 {
+		sim.addSubpopSplit("p3", 770, p2);			
+		p1.setMigrationRates(c(p2, p3), c(3.2e-4, 0.8e-4));
+		p2.setMigrationRates(c(p1, p3), c(3.2e-4, 0.0e-4));
+		p3.setMigrationRates(c(p1, p2), c(0.8e-4, 0.0e-4));
+	}
+
+	//Bottlenecks
+	5500 {  p1.setSubpopulationSize(125); }
+	5501 {  p1.setSubpopulationSize(2400); }
+	
+	5500 {  p2.setSubpopulationSize(50); }
+	5501 {  p2.setSubpopulationSize(770); }
+	
+	5500 {  p3.setSubpopulationSize(14); }
+	5501 {  p3.setSubpopulationSize(770); }
+
+	//recent expansions
+	5680 {  p1.setSubpopulationSize(10000); }
+	5665 {  p2.setSubpopulationSize(10000); }
+	5660 {  p3.setSubpopulationSize(10000); }
+
+
+	// LAST Generation (present)
+	5700 late() {
+		mut = sim.mutationsOfType(m2);
+		pos=mut.position;
+		cat("position\t" + pos + "\n");
+		
+		freq=sim.mutationFrequencies(p1, mut);
+		cat("p1 freq\t" + freq + "\n");
+		freq=sim.mutationFrequencies(p2, mut);
+		cat("p2 freq\t" + freq + "\n");
+		freq=sim.mutationFrequencies(p3, mut);
+		cat("p3 freq\t" + freq + "\n");
+		
+		p1.outputMSSample(200  ,filePath = "tmp_results.txt",append = T); // AFR		
+		p2.outputMSSample(200  ,filePath = "tmp_results.txt",append = T); // EUR		
+		p3.outputMSSample(200  ,filePath = "tmp_results.txt",append = T); // ASI		
+	}
+	
+	5700 {
+		sim.simulationFinished();
+	}
+	
+
+fitness(m2, p2) {
+	if (sim.mutationFrequencies(p1, mut) > 0 ){
+		return 1.0;
+	}
+}
+fitness(m2, p3) {
+	if (sim.mutationFrequencies(p1, mut) > 0 ){
+		return 1.0;
+	}
+}
